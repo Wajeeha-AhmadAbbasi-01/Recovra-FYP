@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Georgia", "Times New Roman", serif;
+  --color-canvas: #f6f3ee;
+  --color-surface: #fffcf8;
+  --color-ink: #1f1c1a;
+  --color-muted: #6f6760;
+  --color-accent: #2f3a36;
+  --color-accent-soft: #e8ebe9;
+  --color-success: #3d6b5a;
+  --color-warning: #9a6b2f;
+  --color-danger: #8f3f3f;
+}
+
+body {
+  @apply bg-canvas text-ink antialiased;
+}
+
+a {
+  @apply text-accent underline-offset-4 hover:underline;
+}
