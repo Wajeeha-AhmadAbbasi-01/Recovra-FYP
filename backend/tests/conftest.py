@@ -8,9 +8,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-os.environ.setdefault("APP_ENV", "test")
-os.environ.setdefault("SESSION_SECRET", "test-session-secret-32chars-min!")
-os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
+os.environ["APP_ENV"] = "test"
+os.environ["SESSION_SECRET"] = "test-session-secret-32chars-min!"
+os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 
 from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
