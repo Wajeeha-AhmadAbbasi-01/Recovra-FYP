@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.modules.audit.service import log_event
 from app.modules.customers.models import Customer
-from app.modules.fbr_validation.engine import PROFILE_VERSION, validate_extracted
+from app.modules.fbr_validation.engine import validate_extracted
+from app.modules.fbr_validation.profiles.v2 import PROFILE_VERSION
+from app.modules.fbr_validation.schemas import ValidationIssue, ValidationResult
 from app.modules.imports.models import Upload, UploadStatus, ValidationAttempt, ValidationStatus
 from app.modules.imports.pdf_extract import extract_invoice_from_pdf
 from app.modules.imports.storage import resolve_path, store_bytes
@@ -94,8 +96,8 @@ async def _process_one(db: Session, user: User, file: UploadFile) -> dict:
         profile_version=PROFILE_VERSION,
         extracted_candidate=validation.normalized,
         local_status=ValidationStatus(validation.status),
-        errors=[issue.__dict__ for issue in validation.issues],
-        warnings=[w.__dict__ for w in validation.warnings],
+        errors=[_issue_dict(issue) for issue in validation.issues],
+        warnings=[_issue_dict(w) for w in validation.warnings],
         evidence=evidence,
     )
     db.add(attempt)
@@ -120,7 +122,26 @@ async def _process_one(db: Session, user: User, file: UploadFile) -> dict:
             attempt.local_status = ValidationStatus.DUPLICATE
             upload.status = UploadStatus.failed
             db.flush()
-            return _result_row(filename, str(upload.id), ValidationStatus.DUPLICATE, [{"message": "Duplicate invoice identity"}])
+            return _result_enriched(
+                filename,
+                str(upload.id),
+                None,
+                ValidationResult(
+                    status=ValidationStatus.DUPLICATE.value,
+                    issues=[
+                        ValidationIssue(
+                            field="invoice",
+                            code="DUPLICATE",
+                            message="Duplicate invoice identity",
+                            source="RECOVRA_BUSINESS",
+                            rule_id="RECOVRA-DUP",
+                        )
+                    ],
+                    warnings=validation.warnings,
+                    normalized=validation.normalized,
+                ),
+                validation.normalized,
+            )
 
         customer = db.scalar(
             select(Customer).where(
@@ -145,6 +166,7 @@ async def _process_one(db: Session, user: User, file: UploadFile) -> dict:
             validation_attempt_id=attempt.id,
             invoice_reference=invoice_ref,
             seller_identity=seller_identity,
+            claimed_fbr_identifier=norm.get("fbr_invoice_number"),
             issue_date=datetime.strptime(norm["issue_date"], "%Y-%m-%d").date(),
             due_date=datetime.strptime(norm["due_date"], "%Y-%m-%d").date(),
             currency=norm.get("currency") or "PKR",
@@ -153,15 +175,29 @@ async def _process_one(db: Session, user: User, file: UploadFile) -> dict:
             lifecycle_status=InvoiceLifecycle.active,
         )
         db.add(invoice)
-        db.add(
-            InvoiceItem(
-                invoice=invoice,
-                description="Imported line",
-                quantity=Decimal("1"),
-                unit_price=total,
-                line_total=total,
+        line_items = norm.get("line_items") or []
+        if line_items:
+            for li in line_items:
+                db.add(
+                    InvoiceItem(
+                        invoice=invoice,
+                        description=str(li.get("description", "Line"))[:512],
+                        quantity=Decimal(str(li.get("quantity", "1"))),
+                        unit_price=Decimal(str(li.get("unit_price", "0"))),
+                        line_total=Decimal(str(li.get("line_total", "0"))),
+                        hs_code=li.get("hs_code"),
+                    )
+                )
+        else:
+            db.add(
+                InvoiceItem(
+                    invoice=invoice,
+                    description="Imported line",
+                    quantity=Decimal("1"),
+                    unit_price=total,
+                    line_total=total,
+                )
             )
-        )
         db.flush()
         invoice_id = str(invoice.id)
         log_event(
@@ -184,17 +220,7 @@ async def _process_one(db: Session, user: User, file: UploadFile) -> dict:
         summary={"status": validation.status},
     )
 
-    norm = validation.normalized
-    return {
-        "filename": filename,
-        "upload_id": str(upload.id),
-        "invoice_id": invoice_id,
-        "invoice_reference": norm.get("invoice_reference"),
-        "buyer_name": norm.get("buyer_name"),
-        "local_status": validation.status,
-        "issues": [issue.__dict__ for issue in validation.issues],
-        "warnings": [w.__dict__ for w in validation.warnings],
-    }
+    return _result_enriched(filename, str(upload.id), invoice_id, validation, validation.normalized)
 
 
 def _finalize_attempt(db, user, upload, local_status, issues, evidence, message):
@@ -223,12 +249,61 @@ def _finalize_attempt(db, user, upload, local_status, issues, evidence, message)
     return _result_row(upload.original_filename, str(upload.id), local_status, [{"message": message}])
 
 
+def _issue_dict(issue) -> dict:
+    if isinstance(issue, ValidationIssue):
+        return issue.__dict__()
+    if isinstance(issue, dict):
+        return issue
+    return {"message": str(issue)}
+
+
+def _result_enriched(
+    filename: str,
+    upload_id: str | None,
+    invoice_id: str | None,
+    validation,
+    norm: dict,
+) -> dict:
+    line_items = norm.get("line_items") or []
+    return {
+        "filename": filename,
+        "upload_id": upload_id,
+        "invoice_id": invoice_id,
+        "invoice_reference": norm.get("invoice_reference"),
+        "seller_name": norm.get("seller_name"),
+        "buyer_name": norm.get("buyer_name"),
+        "issue_date": norm.get("issue_date"),
+        "due_date": norm.get("due_date"),
+        "invoice_total": norm.get("total_amount"),
+        "line_item_count": len(line_items),
+        "validation_profile": norm.get("profile_version", PROFILE_VERSION),
+        "extraction_method": norm.get("extraction_method"),
+        "local_status": validation.status,
+        "local_status_label": _status_label(validation.status),
+        "issues": [_issue_dict(i) for i in validation.issues],
+        "warnings": [_issue_dict(w) for w in validation.warnings],
+    }
+
+
+def _status_label(status: str) -> str:
+    return {
+        ValidationStatus.ACCEPTED_LOCAL_CHECK.value: "Passed Local Validation",
+        ValidationStatus.NEEDS_MANUAL_REVIEW.value: "Needs Manual Review",
+        ValidationStatus.REJECTED_LOCAL_CHECK.value: "Rejected — Validation Failed",
+        ValidationStatus.REJECTED_UNSUPPORTED.value: "Unsupported File",
+        ValidationStatus.DUPLICATE.value: "Already Imported / Duplicate",
+        ValidationStatus.PROCESSING_ERROR.value: "Processing Error",
+    }.get(status, status)
+
+
 def _result_row(filename, upload_id, status_enum, issues):
+    status_val = status_enum.value if hasattr(status_enum, "value") else str(status_enum)
     return {
         "filename": filename,
         "upload_id": upload_id,
         "invoice_id": None,
-        "local_status": status_enum.value,
+        "local_status": status_val,
+        "local_status_label": _status_label(status_val),
         "issues": issues,
         "warnings": [],
     }

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/config";
-import { importStatusLabel, isImportAccepted, isImportDuplicate, isImportRejected } from "@/lib/labels";
+import { importStatusLabel, isImportAccepted, isImportDuplicate, isImportNeedsReview, isImportRejected } from "@/lib/labels";
+import { ImportFindings } from "@/components/imports/import-findings";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,14 +16,6 @@ import { StatusBadge } from "@/components/ui/status-badge";
 const MAX_FILES = 10;
 
 type SelectedFile = { id: string; file: File };
-
-function issueMessages(issues: unknown): string {
-  if (!Array.isArray(issues) || !issues.length) return "—";
-  return issues
-    .map((i) => (typeof i === "object" && i && "message" in i ? String((i as { message?: string }).message) : ""))
-    .filter(Boolean)
-    .join("; ");
-}
 
 export default function ImportsPage() {
   const [queue, setQueue] = useState<SelectedFile[]>([]);
@@ -60,14 +53,16 @@ export default function ImportsPage() {
     let accepted = 0;
     let rejected = 0;
     let duplicate = 0;
+    let needsReview = 0;
     for (const row of results) {
       const status = String(row.local_status);
       if (isImportAccepted(status)) accepted += 1;
       else if (isImportDuplicate(status)) duplicate += 1;
+      else if (isImportNeedsReview(status)) needsReview += 1;
       else if (isImportRejected(status)) rejected += 1;
       else rejected += 1;
     }
-    return { total: results.length, accepted, rejected, duplicate };
+    return { total: results.length, accepted, rejected, duplicate, needsReview };
   }, [results]);
 
   async function onUpload() {
@@ -169,10 +164,11 @@ export default function ImportsPage() {
 
         {results.length ? (
           <div className="mt-8 space-y-6">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {[
                 { label: "Total submitted", value: batchSummary.total },
                 { label: "Accepted", value: batchSummary.accepted, className: "text-success" },
+                { label: "Needs manual review", value: batchSummary.needsReview, className: "text-warning" },
                 { label: "Rejected", value: batchSummary.rejected, className: "text-danger" },
                 { label: "Already imported", value: batchSummary.duplicate, className: "text-warning" },
               ].map((s) => (
@@ -189,8 +185,12 @@ export default function ImportsPage() {
                   <DataTableTh>File</DataTableTh>
                   <DataTableTh>Status</DataTableTh>
                   <DataTableTh>Reference</DataTableTh>
+                  <DataTableTh>Seller</DataTableTh>
                   <DataTableTh>Customer</DataTableTh>
-                  <DataTableTh>Details</DataTableTh>
+                  <DataTableTh>Dates</DataTableTh>
+                  <DataTableTh>Lines</DataTableTh>
+                  <DataTableTh>Profile</DataTableTh>
+                  <DataTableTh>Findings</DataTableTh>
                   <DataTableTh>Action</DataTableTh>
                 </DataTableRow>
               </DataTableHead>
@@ -200,17 +200,30 @@ export default function ImportsPage() {
                     <DataTableTd className="max-w-[160px] truncate">{String(row.filename)}</DataTableTd>
                     <DataTableTd>
                       <StatusBadge status={String(row.local_status)} />
-                      <p className="mt-1 max-w-[200px] text-xs text-muted">{importStatusLabel(String(row.local_status))}</p>
+                      <p className="mt-1 max-w-[200px] text-xs text-muted">
+                        {String(row.local_status_label ?? importStatusLabel(String(row.local_status)))}
+                      </p>
                     </DataTableTd>
                     <DataTableTd className="font-mono text-xs">{String(row.invoice_reference ?? "—")}</DataTableTd>
-                    <DataTableTd>{String(row.buyer_name ?? "—")}</DataTableTd>
-                    <DataTableTd className="max-w-xs whitespace-normal text-muted">
-                      {issueMessages(row.issues)}
-                      {Array.isArray(row.warnings) && row.warnings.length ? (
-                        <p className="mt-1 text-xs">Warnings: {issueMessages(row.warnings)}</p>
-                      ) : null}
+                    <DataTableTd className="max-w-[120px] truncate">{String(row.seller_name ?? "—")}</DataTableTd>
+                    <DataTableTd className="max-w-[120px] truncate">{String(row.buyer_name ?? "—")}</DataTableTd>
+                    <DataTableTd className="text-xs text-muted">
+                      {row.issue_date ? <span>{String(row.issue_date)}</span> : "—"}
+                      {row.due_date ? <span className="block">Due {String(row.due_date)}</span> : null}
+                    </DataTableTd>
+                    <DataTableTd className="tabular-nums text-xs">
+                      {row.line_item_count != null ? String(row.line_item_count) : "—"}
+                    </DataTableTd>
+                    <DataTableTd className="font-mono text-[10px] text-muted">
+                      {String(row.validation_profile ?? "—")}
+                    </DataTableTd>
+                    <DataTableTd>
+                      <ImportFindings issues={row.issues} warnings={row.warnings} />
                       {isImportRejected(String(row.local_status)) ? (
-                        <p className="mt-1 text-xs">Correct missing fields in the PDF and upload again.</p>
+                        <p className="mt-1 text-xs text-muted">Correct fields in the PDF and upload again.</p>
+                      ) : null}
+                      {isImportNeedsReview(String(row.local_status)) ? (
+                        <p className="mt-1 text-xs text-muted">Use a text-based PDF or add machine-readable labels.</p>
                       ) : null}
                     </DataTableTd>
                     <DataTableTd>

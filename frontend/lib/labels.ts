@@ -19,6 +19,10 @@ export function isImportDuplicate(status: string): boolean {
   return status === "DUPLICATE";
 }
 
+export function isImportNeedsReview(status: string): boolean {
+  return status === "NEEDS_MANUAL_REVIEW";
+}
+
 export function isImportRejected(status: string): boolean {
   return (
     status === "REJECTED_LOCAL_CHECK" ||
@@ -26,3 +30,12 @@ export function isImportRejected(status: string): boolean {
     status === "PROCESSING_ERROR"
   );
 }
+
+export type ImportIssue = {
+  field?: string;
+  code?: string;
+  message?: string;
+  source?: string;
+  rule_id?: string;
+  severity?: string;
+};
