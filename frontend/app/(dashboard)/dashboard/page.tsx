@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { api } from "@/lib/api";
+import { useReceivablesRefresh } from "@/lib/use-receivables-refresh";
 import { agingBucketLabel, formatDate, formatPkr } from "@/lib/format";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionPanel } from "@/components/layout/section-panel";
@@ -26,8 +27,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([api.dashboardSummary(), api.dashboardAging(), api.dashboardOverdue()])
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    return Promise.all([api.dashboardSummary(), api.dashboardAging(), api.dashboardOverdue()])
       .then(([s, a, o]) => {
         if (s.error || a.error || o.error) {
           setError(s.error?.message ?? a.error?.message ?? o.error?.message ?? "Could not load dashboard");
@@ -40,6 +43,8 @@ export default function DashboardPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useReceivablesRefresh(load);
 
   if (loading) {
     return (

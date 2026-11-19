@@ -15,6 +15,7 @@ export type ApiResult<T> = {
 async function json<T>(path: string, init?: RequestInit): Promise<ApiResult<T>> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     credentials: "include",
+    cache: "no-store",
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     ...init,
   });
@@ -48,6 +49,8 @@ export const api = {
 
   dashboardOverdue: () => json<Array<Record<string, unknown>>>("/api/v1/dashboard/overdue-invoices"),
 
+  importsRecent: () => json<Array<Record<string, unknown>>>("/api/v1/imports/recent"),
+
   members: () => json<Array<Record<string, unknown>>>("/api/v1/team/members"),
 
   invitations: () => json<Array<Record<string, unknown>>>("/api/v1/team/invitations"),
@@ -64,6 +67,7 @@ export const api = {
     const res = await fetch(`${API_BASE_URL}/api/v1/imports/pdf-batch`, {
       method: "POST",
       credentials: "include",
+      cache: "no-store",
       body: form,
     });
     return res.json();

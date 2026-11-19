@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { api } from "@/lib/api";
+import { useReceivablesRefresh } from "@/lib/use-receivables-refresh";
 import { agingBucketLabel, overdueStatus } from "@/lib/format";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -22,9 +23,10 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setLoading(true);
-    api.invoices(q).then((res) => {
+    setError(null);
+    return api.invoices(q).then((res) => {
       if (res.error) {
         setError(res.error.message ?? "Could not load invoices");
         setLoading(false);
@@ -34,6 +36,8 @@ export default function InvoicesPage() {
       setLoading(false);
     });
   }, [q]);
+
+  useReceivablesRefresh(load, [q]);
 
   return (
     <div>

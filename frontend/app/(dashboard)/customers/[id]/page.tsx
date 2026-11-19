@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { api } from "@/lib/api";
+import { useReceivablesRefresh } from "@/lib/use-receivables-refresh";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { CurrencyDisplay } from "@/components/ui/currency-display";
@@ -21,8 +22,10 @@ export default function CustomerDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api.customer(params.id).then((res) => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    return api.customer(params.id).then((res) => {
       if (res.error) {
         setError(res.error.message ?? "Customer not found");
         setLoading(false);
@@ -32,6 +35,8 @@ export default function CustomerDetailPage() {
       setLoading(false);
     });
   }, [params.id]);
+
+  useReceivablesRefresh(load, [params.id]);
 
   if (loading) return <LoadingSkeleton className="h-40" />;
   if (error) return <ErrorState message={error} />;

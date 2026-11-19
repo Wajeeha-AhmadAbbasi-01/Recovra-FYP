@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -19,6 +19,76 @@ from app.modules.invoices.models import Invoice, InvoiceItem, InvoiceLifecycle
 from app.modules.users.models import User
 
 settings = get_settings()
+
+
+def _active_invoice_for_upload(db: Session, tenant_id: uuid.UUID, upload_id: uuid.UUID) -> Invoice | None:
+    return db.scalar(
+        select(Invoice).where(
+            Invoice.tenant_id == tenant_id,
+            Invoice.upload_id == upload_id,
+            Invoice.lifecycle_status == InvoiceLifecycle.active,
+        )
+    )
+
+
+def _norm_from_invoice(invoice: Invoice) -> dict:
+    seller_name = None
+    seller_ntn = None
+    if invoice.seller_identity and "|" in invoice.seller_identity:
+        seller_name, seller_ntn = invoice.seller_identity.split("|", 1)
+    elif invoice.seller_identity:
+        seller_name = invoice.seller_identity
+    return {
+        "invoice_reference": invoice.invoice_reference,
+        "fbr_invoice_number": invoice.claimed_fbr_identifier,
+        "seller_name": seller_name,
+        "seller_ntn": seller_ntn,
+        "issue_date": invoice.issue_date.isoformat(),
+        "due_date": invoice.due_date.isoformat() if invoice.due_date else None,
+        "currency": invoice.currency,
+        "total_amount": str(invoice.total_amount),
+        "profile_version": PROFILE_VERSION,
+        "line_items": [],
+    }
+
+
+def _duplicate_label(kind: str) -> str:
+    if kind == "file":
+        return "Already imported — same PDF file"
+    if kind == "invoice":
+        return "Already imported — invoice already in workspace"
+    return "Already Imported / Duplicate"
+
+
+def _duplicate_result(
+    filename: str,
+    upload_id: str | None,
+    invoice: Invoice,
+    *,
+    kind: str,
+    code: str,
+    message: str,
+) -> dict:
+    norm = _norm_from_invoice(invoice)
+    validation = ValidationResult(
+        status=ValidationStatus.DUPLICATE.value,
+        issues=[
+            ValidationIssue(
+                field="invoice",
+                code=code,
+                message=message,
+                source="RECOVRA_BUSINESS",
+                rule_id="RECOVRA-DUP",
+            )
+        ],
+        warnings=[],
+        normalized=norm,
+    )
+    out = _result_enriched(filename, upload_id, str(invoice.id), validation, norm)
+    out["duplicate_kind"] = kind
+    out["local_status_label"] = _duplicate_label(kind)
+    out["receivables_saved"] = True
+    return out
 
 
 async def process_pdf_batch(db: Session, user: User, files: list[UploadFile]) -> list[dict]:
@@ -50,7 +120,17 @@ async def _process_one(db: Session, user: User, file: UploadFile) -> dict:
         select(Upload).where(Upload.tenant_id == user.tenant_id, Upload.sha256 == sha256)
     )
     if duplicate_upload:
-        return _result_row(filename, str(duplicate_upload.id), ValidationStatus.DUPLICATE, [{"message": "Duplicate file"}])
+        existing = _active_invoice_for_upload(db, user.tenant_id, duplicate_upload.id)
+        if existing:
+            return _duplicate_result(
+                filename,
+                str(duplicate_upload.id),
+                existing,
+                kind="file",
+                code="DUPLICATE_FILE",
+                message="This exact PDF file was already imported successfully.",
+            )
+        # Prior upload exists but did not create an invoice — allow re-validation.
 
     upload = Upload(
         tenant_id=user.tenant_id,
@@ -107,8 +187,10 @@ async def _process_one(db: Session, user: User, file: UploadFile) -> dict:
     invoice_id: str | None = None
     if validation.status == ValidationStatus.ACCEPTED_LOCAL_CHECK.value:
         norm = validation.normalized
+        buyer_name = (norm.get("buyer_name") or "").strip()
+        buyer_ntn = (norm.get("buyer_ntn") or "").strip() or None
         seller_identity = f"{norm.get('seller_name','')}|{norm.get('seller_ntn','')}".strip("|")
-        invoice_ref = norm["invoice_reference"]
+        invoice_ref = (norm.get("invoice_reference") or "").strip()
 
         dup_invoice = db.scalar(
             select(Invoice).where(
@@ -122,17 +204,17 @@ async def _process_one(db: Session, user: User, file: UploadFile) -> dict:
             attempt.local_status = ValidationStatus.DUPLICATE
             upload.status = UploadStatus.failed
             db.flush()
-            return _result_enriched(
+            out = _result_enriched(
                 filename,
                 str(upload.id),
-                None,
+                str(dup_invoice.id),
                 ValidationResult(
                     status=ValidationStatus.DUPLICATE.value,
                     issues=[
                         ValidationIssue(
                             field="invoice",
-                            code="DUPLICATE",
-                            message="Duplicate invoice identity",
+                            code="DUPLICATE_INVOICE",
+                            message="An active invoice with this seller and reference already exists.",
                             source="RECOVRA_BUSINESS",
                             rule_id="RECOVRA-DUP",
                         )
@@ -142,64 +224,101 @@ async def _process_one(db: Session, user: User, file: UploadFile) -> dict:
                 ),
                 validation.normalized,
             )
+            out["duplicate_kind"] = "invoice"
+            out["local_status_label"] = _duplicate_label("invoice")
+            return out
 
-        customer = db.scalar(
-            select(Customer).where(
-                Customer.tenant_id == user.tenant_id,
-                Customer.business_name == norm.get("buyer_name"),
+        customer = None
+        if buyer_ntn:
+            customer = db.scalar(
+                select(Customer).where(
+                    Customer.tenant_id == user.tenant_id,
+                    Customer.buyer_ntn == buyer_ntn,
+                )
             )
-        )
+        if not customer and buyer_name:
+            customer = db.scalar(
+                select(Customer).where(
+                    Customer.tenant_id == user.tenant_id,
+                    Customer.business_name == buyer_name,
+                )
+            )
         if not customer:
             customer = Customer(
                 tenant_id=user.tenant_id,
-                business_name=norm["buyer_name"],
-                buyer_ntn=norm.get("buyer_ntn"),
+                business_name=buyer_name,
+                buyer_ntn=buyer_ntn,
             )
             db.add(customer)
             db.flush()
 
-        total = Decimal(norm["total_amount"])
-        invoice = Invoice(
-            tenant_id=user.tenant_id,
-            customer_id=customer.id,
-            upload_id=upload.id,
-            validation_attempt_id=attempt.id,
-            invoice_reference=invoice_ref,
-            seller_identity=seller_identity,
-            claimed_fbr_identifier=norm.get("fbr_invoice_number"),
-            issue_date=datetime.strptime(norm["issue_date"], "%Y-%m-%d").date(),
-            due_date=datetime.strptime(norm["due_date"], "%Y-%m-%d").date(),
-            currency=norm.get("currency") or "PKR",
-            total_amount=total,
-            outstanding_amount=total,
-            lifecycle_status=InvoiceLifecycle.active,
-        )
-        db.add(invoice)
-        line_items = norm.get("line_items") or []
-        if line_items:
-            for li in line_items:
-                db.add(
-                    InvoiceItem(
-                        invoice=invoice,
-                        description=str(li.get("description", "Line"))[:512],
-                        quantity=Decimal(str(li.get("quantity", "1"))),
-                        unit_price=Decimal(str(li.get("unit_price", "0"))),
-                        line_total=Decimal(str(li.get("line_total", "0"))),
-                        hs_code=li.get("hs_code"),
+        try:
+            with db.begin_nested():
+                raw_total = norm.get("total_amount")
+                if raw_total is None:
+                    raise ValueError("total_amount is missing after validation")
+                total = Decimal(str(raw_total))
+                invoice = Invoice(
+                    tenant_id=user.tenant_id,
+                    customer_id=customer.id,
+                    upload_id=upload.id,
+                    validation_attempt_id=attempt.id,
+                    invoice_reference=invoice_ref,
+                    seller_identity=seller_identity,
+                    claimed_fbr_identifier=norm.get("fbr_invoice_number"),
+                    issue_date=datetime.strptime(norm["issue_date"], "%Y-%m-%d").date(),
+                    due_date=datetime.strptime(norm["due_date"], "%Y-%m-%d").date(),
+                    currency=norm.get("currency") or "PKR",
+                    total_amount=total,
+                    outstanding_amount=total,
+                    lifecycle_status=InvoiceLifecycle.active,
+                )
+                db.add(invoice)
+                line_items = norm.get("line_items") or []
+                if line_items:
+                    for li in line_items:
+                        db.add(
+                            InvoiceItem(
+                                invoice=invoice,
+                                description=str(li.get("description", "Line"))[:512],
+                                quantity=Decimal(str(li.get("quantity", "1"))),
+                                unit_price=Decimal(str(li.get("unit_price", "0"))),
+                                line_total=Decimal(str(li.get("line_total", "0"))),
+                                hs_code=li.get("hs_code"),
+                            )
+                        )
+                else:
+                    db.add(
+                        InvoiceItem(
+                            invoice=invoice,
+                            description="Imported line",
+                            quantity=Decimal("1"),
+                            unit_price=total,
+                            line_total=total,
+                        )
                     )
-                )
-        else:
-            db.add(
-                InvoiceItem(
-                    invoice=invoice,
-                    description="Imported line",
-                    quantity=Decimal("1"),
-                    unit_price=total,
-                    line_total=total,
-                )
+                db.flush()
+                invoice_id = str(invoice.id)
+        except Exception as exc:
+            attempt.local_status = ValidationStatus.PROCESSING_ERROR
+            upload.status = UploadStatus.failed
+            db.flush()
+            fail = ValidationResult(
+                status=ValidationStatus.PROCESSING_ERROR.value,
+                issues=[
+                    ValidationIssue(
+                        field="invoice",
+                        code="PERSISTENCE_FAILED",
+                        message=f"Validation passed but invoice could not be saved: {exc}",
+                        source="RECOVRA_BUSINESS",
+                        rule_id="RECOVRA-PERSIST",
+                    )
+                ],
+                warnings=validation.warnings,
+                normalized=validation.normalized,
             )
-        db.flush()
-        invoice_id = str(invoice.id)
+            return _result_enriched(filename, str(upload.id), None, fail, validation.normalized)
+
         log_event(
             db,
             tenant_id=user.tenant_id,
@@ -282,6 +401,8 @@ def _result_enriched(
         "local_status_label": _status_label(validation.status),
         "issues": [_issue_dict(i) for i in validation.issues],
         "warnings": [_issue_dict(w) for w in validation.warnings],
+        "duplicate_kind": None,
+        "receivables_saved": invoice_id is not None,
     }
 
 
@@ -306,6 +427,7 @@ def _result_row(filename, upload_id, status_enum, issues):
         "local_status_label": _status_label(status_val),
         "issues": issues,
         "warnings": [],
+        "receivables_saved": False,
     }
 
 
@@ -314,6 +436,41 @@ def get_upload_detail(db: Session, user: User, upload_id: uuid.UUID) -> Upload:
     if not upload or upload.tenant_id != user.tenant_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload not found")
     return upload
+
+
+def list_recent_imports(db: Session, user: User, *, limit: int = 30) -> list[dict]:
+    uploads = list(
+        db.scalars(
+            select(Upload)
+            .where(Upload.tenant_id == user.tenant_id)
+            .order_by(Upload.received_at.desc())
+            .limit(limit)
+        ).all()
+    )
+    rows: list[dict] = []
+    for upload in uploads:
+        attempt = db.scalar(
+            select(ValidationAttempt)
+            .where(
+                ValidationAttempt.upload_id == upload.id,
+                ValidationAttempt.tenant_id == user.tenant_id,
+            )
+            .order_by(ValidationAttempt.created_at.desc())
+        )
+        invoice = _active_invoice_for_upload(db, user.tenant_id, upload.id)
+        norm = (attempt.extracted_candidate if attempt else None) or {}
+        status_val = attempt.local_status.value if attempt else ValidationStatus.PROCESSING_ERROR.value
+        pseudo = ValidationResult(status=status_val, issues=[], warnings=[], normalized=norm)
+        row = _result_enriched(
+            upload.original_filename,
+            str(upload.id),
+            str(invoice.id) if invoice else None,
+            pseudo,
+            norm,
+        )
+        row["received_at"] = upload.received_at.isoformat()
+        rows.append(row)
+    return rows
 
 
 def get_validation_for_upload(db: Session, user: User, upload_id: uuid.UUID) -> ValidationAttempt | None:

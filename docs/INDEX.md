@@ -35,6 +35,8 @@
 ## Modules
 
 - [modules/MODULE_01_INVOICE_INTAKE.md](modules/MODULE_01_INVOICE_INTAKE.md)
+- [modules/module-1/invoice-data-synchronization.md](modules/module-1/invoice-data-synchronization.md)
+- [modules/module-1/invoice-ingestion-v2.md](modules/module-1/invoice-ingestion-v2.md)
 
 ## Testing
 

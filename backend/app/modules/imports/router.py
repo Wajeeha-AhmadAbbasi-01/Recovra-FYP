@@ -25,6 +25,16 @@ def sample_invoice_pdf() -> Response:
     )
 
 
+@router.get("/recent", response_model=ApiResponse[list])
+def recent_imports(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    limit: int = 30,
+) -> ApiResponse[list]:
+    rows = import_service.list_recent_imports(db, user, limit=limit)
+    return success(rows)
+
+
 @router.post("/pdf-batch", response_model=ApiResponse[dict])
 async def pdf_batch(
     files: list[UploadFile] = File(...),

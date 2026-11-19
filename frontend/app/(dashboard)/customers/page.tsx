@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { api } from "@/lib/api";
+import { useReceivablesRefresh } from "@/lib/use-receivables-refresh";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { DataTable, DataTableBody, DataTableHead, DataTableRow, DataTableTd, DataTableTh } from "@/components/ui/data-table";
@@ -16,8 +17,10 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.customers().then((res) => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    return api.customers().then((res) => {
       if (res.error) {
         setError(res.error.message ?? "Could not load customers");
         setLoading(false);
@@ -27,6 +30,8 @@ export default function CustomersPage() {
       setLoading(false);
     });
   }, []);
+
+  useReceivablesRefresh(load);
 
   if (loading) {
     return (
