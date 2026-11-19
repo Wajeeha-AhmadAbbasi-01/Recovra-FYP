@@ -41,7 +41,7 @@ export default function SignupPage() {
   return (
     <div className="mx-auto flex min-h-screen max-w-lg items-center px-6 py-12">
       <Card className="w-full">
-        <h1 className="font-display text-3xl">Create your workspace</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Create your workspace</h1>
         <p className="mt-2 text-sm text-muted">Register your business, then sign in with the same email.</p>
         <form className="mt-8 space-y-4" onSubmit={onSubmit}>
           <Input name="business_name" placeholder="Business name" required />

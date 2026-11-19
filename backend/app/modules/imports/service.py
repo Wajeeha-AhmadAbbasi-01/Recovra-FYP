@@ -184,10 +184,13 @@ async def _process_one(db: Session, user: User, file: UploadFile) -> dict:
         summary={"status": validation.status},
     )
 
+    norm = validation.normalized
     return {
         "filename": filename,
         "upload_id": str(upload.id),
         "invoice_id": invoice_id,
+        "invoice_reference": norm.get("invoice_reference"),
+        "buyer_name": norm.get("buyer_name"),
         "local_status": validation.status,
         "issues": [issue.__dict__ for issue in validation.issues],
         "warnings": [w.__dict__ for w in validation.warnings],

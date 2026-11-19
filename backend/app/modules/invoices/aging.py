@@ -40,3 +40,13 @@ def bucket_outstanding(rows: list[tuple[date | None, Decimal]]) -> dict[str, Dec
         bucket = aging_bucket(due_date)
         totals[bucket] += amount
     return totals
+
+
+def bucket_invoice_counts(rows: list[date | None]) -> dict[str, int]:
+    counts = dict.fromkeys(BUCKETS, 0)
+    ref = today_karachi()
+    for due_date in rows:
+        if due_date is None:
+            continue
+        counts[aging_bucket(due_date, ref)] += 1
+    return counts

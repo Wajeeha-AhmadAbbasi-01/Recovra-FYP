@@ -17,6 +17,9 @@ Defined in `frontend/app/globals.css` and `tailwind.config.ts`:
 ## Shared components
 
 - `Button`, `Input`, `Card`, `StatusBadge`, `PageHeader`, `WorkspaceShell`
+- `SummaryCard`, `EmptyState`, `ErrorState`, `LoadingSkeleton`, `CurrencyDisplay`, `DateDisplay`
+
+Format helpers: `frontend/lib/format.ts` (PKR, Karachi dates, aging labels).
 
 ## Routes
 

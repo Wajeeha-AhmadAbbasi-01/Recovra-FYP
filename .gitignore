@@ -15,6 +15,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!frontend/lib/
 lib64/
 parts/
 sdist/
@@ -212,6 +213,7 @@ tempCodeRunnerFile.py
 node_modules/
 .next/
 out/
+*.tsbuildinfo
 
 # Recovra runtime data
 data/

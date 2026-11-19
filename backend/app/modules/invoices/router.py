@@ -29,11 +29,13 @@ def list_invoices(
         if q and q.lower() not in inv.invoice_reference.lower():
             continue
         due = inv.due_date
+        customer = db.get(Customer, inv.customer_id)
         payload.append(
             {
                 "id": str(inv.id),
                 "invoice_reference": inv.invoice_reference,
                 "customer_id": str(inv.customer_id),
+                "customer_name": customer.business_name if customer else None,
                 "issue_date": inv.issue_date.isoformat(),
                 "due_date": due.isoformat() if due else None,
                 "currency": inv.currency,

@@ -9,18 +9,23 @@ const config: Config = {
         surface: "var(--color-surface)",
         ink: "var(--color-ink)",
         muted: "var(--color-muted)",
+        border: "var(--color-border)",
         accent: "var(--color-accent)",
+        accentHover: "var(--color-accent-hover)",
         accentSoft: "var(--color-accent-soft)",
         success: "var(--color-success)",
         warning: "var(--color-warning)",
         danger: "var(--color-danger)",
+        tableHeader: "var(--color-table-header)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        display: ["var(--font-display)", "Georgia", "serif"],
       },
-      boxShadow: {
-        soft: "0 12px 40px rgba(26, 24, 22, 0.06)",
+      borderRadius: {
+        card: "12px",
+      },
+      maxWidth: {
+        content: "1440px",
       },
     },
   },

@@ -31,7 +31,7 @@ export default function AcceptInvitePage() {
   return (
     <div className="mx-auto flex min-h-screen max-w-md items-center px-6 py-12">
       <Card className="w-full">
-        <h1 className="font-display text-3xl">Join workspace</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Join workspace</h1>
         <p className="mt-2 text-sm text-muted">Set your name and password to accept the invitation.</p>
         <form className="mt-8 space-y-4" onSubmit={onSubmit}>
           <Input name="full_name" placeholder="Full name" required />

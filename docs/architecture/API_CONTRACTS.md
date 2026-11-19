@@ -33,8 +33,9 @@ Envelope: `{ "data": ..., "error": null|{code,message,details}, "meta": { "reque
 | GET | `/api/v1/imports/{id}/validation` | Session |
 | GET | `/api/v1/imports/{id}/document` | Session |
 | GET | `/api/v1/imports/sample-invoice.pdf` | Public |
-| GET | `/api/v1/dashboard/summary` | Session |
-| GET | `/api/v1/dashboard/aging` | Session |
+| GET | `/api/v1/dashboard/summary` | Session (+ overdue totals) |
+| GET | `/api/v1/dashboard/aging` | Session (+ `bucket_counts`) |
+| GET | `/api/v1/dashboard/overdue-invoices` | Session (`?limit=100`) |
 | GET | `/api/v1/health` | Public |
 
 Session cookie name: `recovra_session` (configurable).

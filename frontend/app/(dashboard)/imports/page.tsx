@@ -1,78 +1,241 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
+import { importStatusLabel, isImportAccepted, isImportDuplicate, isImportRejected } from "@/lib/labels";
 import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DataTable, DataTableBody, DataTableHead, DataTableRow, DataTableTd, DataTableTh } from "@/components/ui/data-table";
+import { ErrorState } from "@/components/ui/error-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 
+const MAX_FILES = 10;
+
+type SelectedFile = { id: string; file: File };
+
+function issueMessages(issues: unknown): string {
+  if (!Array.isArray(issues) || !issues.length) return "—";
+  return issues
+    .map((i) => (typeof i === "object" && i && "message" in i ? String((i as { message?: string }).message) : ""))
+    .filter(Boolean)
+    .join("; ");
+}
+
 export default function ImportsPage() {
+  const [queue, setQueue] = useState<SelectedFile[]>([]);
   const [results, setResults] = useState<Array<Record<string, unknown>>>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const list = e.target.files;
-    if (!list?.length) return;
+  const addFiles = useCallback((list: FileList | File[]) => {
+    setError(null);
+    const existing = new Set(queue.map((q) => q.file.name));
+    const next: SelectedFile[] = [...queue];
+    for (const file of Array.from(list)) {
+      if (next.length >= MAX_FILES) {
+        setError(`You can upload up to ${MAX_FILES} files per batch.`);
+        break;
+      }
+      if (!file.name.toLowerCase().endsWith(".pdf")) {
+        setError("Only PDF files are supported.");
+        continue;
+      }
+      if (existing.has(file.name)) continue;
+      existing.add(file.name);
+      next.push({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, file });
+    }
+    setQueue(next);
+  }, [queue]);
+
+  function removeFile(id: string) {
+    setQueue((prev) => prev.filter((f) => f.id !== id));
+  }
+
+  const batchSummary = useMemo(() => {
+    let accepted = 0;
+    let rejected = 0;
+    let duplicate = 0;
+    for (const row of results) {
+      const status = String(row.local_status);
+      if (isImportAccepted(status)) accepted += 1;
+      else if (isImportDuplicate(status)) duplicate += 1;
+      else if (isImportRejected(status)) rejected += 1;
+      else rejected += 1;
+    }
+    return { total: results.length, accepted, rejected, duplicate };
+  }, [results]);
+
+  async function onUpload() {
+    if (!queue.length || loading) return;
     setLoading(true);
     setError(null);
-    const res = await api.uploadPdfs(list);
+    setResults([]);
+    const dt = new DataTransfer();
+    queue.forEach((q) => dt.items.add(q.file));
+    const res = await api.uploadPdfs(dt.files);
     setLoading(false);
     if (res.error) {
-      setError(res.error.message);
+      setError(res.error.message ?? "Upload failed. Check your connection and try again.");
       return;
     }
     setResults(res.data?.results ?? []);
+    setQueue([]);
   }
 
   return (
     <div>
       <PageHeader
-        title="PDF imports"
-        subtitle="Batch upload sales-tax invoice PDFs for local format checks (not FBR verification)."
+        title="Import Invoices"
+        subtitle="Upload sales-tax invoice PDFs for local format checks before they appear in your receivables."
+        disclaimer="Format checks do not constitute official FBR verification."
       />
+
       <Card>
-        <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-black/15 bg-canvas px-6 py-12 text-center">
-          <span className="text-sm font-medium">Drop PDFs here or click to browse</span>
-          <span className="mt-1 text-xs text-muted">Up to 10 files · text-based PDFs · one invoice per file</span>
-          <input type="file" accept="application/pdf" multiple className="hidden" onChange={onUpload} disabled={loading} />
-        </label>
-        {loading ? <p className="mt-4 text-sm text-muted">Processing batch…</p> : null}
-        {error ? <p className="mt-4 text-sm text-danger">{error}</p> : null}
+        <div
+          role="button"
+          tabIndex={0}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+          }}
+          onClick={() => inputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
+          }}
+          className={`flex cursor-pointer flex-col items-center justify-center rounded-card border-2 border-dashed px-6 py-12 text-center transition ${
+            dragOver ? "border-accent bg-accentSoft" : "border-border bg-canvas"
+          }`}
+        >
+          <svg className="mb-3 h-10 w-10 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6h.1a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          <p className="text-sm font-medium">Drag and drop PDF invoices here</p>
+          <p className="mt-1 text-xs text-muted">Or use Browse Files · up to {MAX_FILES} per batch · one invoice per PDF · text-based PDFs only</p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="application/pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) addFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button type="button" variant="secondary" onClick={() => inputRef.current?.click()} disabled={loading}>
+            Browse Files
+          </Button>
+          <Button type="button" onClick={onUpload} disabled={loading || !queue.length}>
+            {loading ? "Uploading…" : "Upload batch"}
+          </Button>
+        </div>
+
+        {queue.length ? (
+          <div className="mt-6">
+            <p className="text-sm font-medium">
+              Selected ({queue.length}/{MAX_FILES})
+            </p>
+            <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
+              {queue.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+                  <span className="truncate">{item.file.name}</span>
+                  <button type="button" className="text-muted hover:text-ink" onClick={() => removeFile(item.id)}>
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-muted">No files selected.</p>
+        )}
+
+        {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+        {loading ? <p className="mt-4 text-sm text-muted">Processing batch… please wait.</p> : null}
+
         {results.length ? (
-          <div className="mt-8 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-black/10 text-muted">
-                  <th className="py-2 pr-4">File</th>
-                  <th className="py-2 pr-4">Local check status</th>
-                  <th className="py-2">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="mt-8 space-y-6">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { label: "Total submitted", value: batchSummary.total },
+                { label: "Accepted", value: batchSummary.accepted, className: "text-success" },
+                { label: "Rejected", value: batchSummary.rejected, className: "text-danger" },
+                { label: "Already imported", value: batchSummary.duplicate, className: "text-warning" },
+              ].map((s) => (
+                <div key={s.label} className="rounded-lg border border-border bg-canvas p-4">
+                  <p className="text-xs font-medium text-muted">{s.label}</p>
+                  <p className={`mt-1 text-xl font-semibold tabular-nums ${s.className ?? "text-ink"}`}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <DataTable className="mt-6">
+              <DataTableHead>
+                <DataTableRow>
+                  <DataTableTh>File</DataTableTh>
+                  <DataTableTh>Status</DataTableTh>
+                  <DataTableTh>Reference</DataTableTh>
+                  <DataTableTh>Customer</DataTableTh>
+                  <DataTableTh>Details</DataTableTh>
+                  <DataTableTh>Action</DataTableTh>
+                </DataTableRow>
+              </DataTableHead>
+              <DataTableBody>
                 {results.map((row, idx) => (
-                  <tr key={idx} className="border-b border-black/5">
-                    <td className="py-3 pr-4">{String(row.filename)}</td>
-                    <td className="py-3 pr-4">
+                  <DataTableRow key={idx}>
+                    <DataTableTd className="max-w-[160px] truncate">{String(row.filename)}</DataTableTd>
+                    <DataTableTd>
                       <StatusBadge status={String(row.local_status)} />
-                    </td>
-                    <td className="py-3 text-muted">
-                      {Array.isArray(row.issues) && row.issues.length
-                        ? String((row.issues as Array<{ message?: string }>)[0]?.message)
-                        : "—"}
-                    </td>
-                  </tr>
+                      <p className="mt-1 max-w-[200px] text-xs text-muted">{importStatusLabel(String(row.local_status))}</p>
+                    </DataTableTd>
+                    <DataTableTd className="font-mono text-xs">{String(row.invoice_reference ?? "—")}</DataTableTd>
+                    <DataTableTd>{String(row.buyer_name ?? "—")}</DataTableTd>
+                    <DataTableTd className="max-w-xs whitespace-normal text-muted">
+                      {issueMessages(row.issues)}
+                      {Array.isArray(row.warnings) && row.warnings.length ? (
+                        <p className="mt-1 text-xs">Warnings: {issueMessages(row.warnings)}</p>
+                      ) : null}
+                      {isImportRejected(String(row.local_status)) ? (
+                        <p className="mt-1 text-xs">Correct missing fields in the PDF and upload again.</p>
+                      ) : null}
+                    </DataTableTd>
+                    <DataTableTd>
+                      {row.invoice_id ? (
+                        <Link href={`/invoices/${row.invoice_id}`} className="text-sm font-medium no-underline">
+                          View invoice
+                        </Link>
+                      ) : null}
+                    </DataTableTd>
+                  </DataTableRow>
                 ))}
-              </tbody>
-            </table>
+              </DataTableBody>
+            </DataTable>
           </div>
         ) : null}
-        <p className="mt-6 text-xs text-muted">
-          Invalid uploads?{" "}
-          <a href={`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"}/api/v1/imports/sample-invoice.pdf`}>
-            Download illustrative sample (non-official)
-          </a>
-        </p>
+
+        <h2 className="mt-10 text-sm font-semibold">Download Sample Invoice Format</h2>
+        <p className="mt-1 text-xs text-muted">Illustrative structure only — not an official FBR document.</p>
+        <a
+          href={`${API_BASE_URL}/api/v1/imports/sample-invoice.pdf`}
+          className="mt-2 inline-block text-sm font-medium"
+          download
+        >
+          Download Sample Invoice Format
+        </a>
       </Card>
     </div>
   );

@@ -7,7 +7,7 @@ export default function LandingPage() {
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8">
         <div>
-          <p className="font-display text-2xl font-semibold">Recovra</p>
+          <p className="font-semibold tracking-tight text-2xl font-semibold">Recovra</p>
           <p className="text-sm text-muted">Receivables clarity for Pakistani SMEs</p>
         </div>
         <div className="flex gap-3">
@@ -22,7 +22,7 @@ export default function LandingPage() {
 
       <section className="mx-auto grid max-w-6xl gap-10 px-6 py-16 lg:grid-cols-2 lg:items-center">
         <div>
-          <h1 className="font-display text-5xl leading-tight text-ink">
+          <h1 className="font-semibold tracking-tight text-5xl leading-tight text-ink">
             Know what you are owed—without the banking-dashboard noise.
           </h1>
           <p className="mt-6 max-w-xl text-lg text-muted">

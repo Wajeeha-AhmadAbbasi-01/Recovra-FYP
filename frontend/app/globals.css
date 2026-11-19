@@ -3,23 +3,45 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Georgia", "Times New Roman", serif;
-  --color-canvas: #f6f3ee;
-  --color-surface: #fffcf8;
-  --color-ink: #1f1c1a;
-  --color-muted: #6f6760;
-  --color-accent: #2f3a36;
-  --color-accent-soft: #e8ebe9;
-  --color-success: #3d6b5a;
-  --color-warning: #9a6b2f;
-  --color-danger: #8f3f3f;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-soft: #eff6ff;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --color-danger: #b91c1c;
+  --color-table-header: #f8fafc;
 }
 
-body {
-  @apply bg-canvas text-ink antialiased;
+@layer base {
+  body {
+    @apply bg-canvas text-ink antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  a {
+    @apply text-accent underline-offset-4 transition-colors hover:text-accentHover hover:underline;
+  }
 }
 
-a {
-  @apply text-accent underline-offset-4 hover:underline;
+@layer utilities {
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

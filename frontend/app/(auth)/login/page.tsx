@@ -34,7 +34,7 @@ export default function LoginPage() {
   return (
     <div className="mx-auto flex min-h-screen max-w-md items-center px-6 py-12">
       <Card className="w-full">
-        <h1 className="font-display text-3xl">Welcome back</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
         {registered ? (
           <p className="mt-2 text-sm text-success">Account created. Sign in to continue.</p>
         ) : (
