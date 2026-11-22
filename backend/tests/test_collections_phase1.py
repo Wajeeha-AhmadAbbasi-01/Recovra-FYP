@@ -143,7 +143,7 @@ def test_promise_and_dispute_do_not_change_balance_or_holds(client, db, unique_e
     )
     assert promise.status_code == 201
     assert promise.json()["data"]["status"] == "RECORDED"
-    assert promise.json()["data"]["scheduling_effect"] == "NOT_IMPLEMENTED"
+    assert promise.json()["data"]["scheduling_effect"] == "routine_may_apply"
     promise_id = promise.json()["data"]["id"]
 
     confirmed = client.patch(f"/api/v1/collections/promises/{promise_id}", json={"status": "CONFIRMED"})
@@ -164,8 +164,13 @@ def test_promise_and_dispute_do_not_change_balance_or_holds(client, db, unique_e
     dispute_id = dispute.json()["data"]["id"]
     assert client.patch(f"/api/v1/collections/disputes/{dispute_id}", json={"status": "CONFIRMED"}).status_code == 200
 
-    holds = db.scalar(select(func.count()).select_from(ReminderHold).where(ReminderHold.invoice_id == invoice.id))
-    assert holds == 0
+    active_holds = db.scalar(
+        select(func.count()).select_from(ReminderHold).where(
+            ReminderHold.invoice_id == invoice.id,
+            ReminderHold.active.is_(True),
+        )
+    )
+    assert active_holds == 2
     db.refresh(invoice)
     assert invoice.outstanding_amount == Decimal("1000.00")
 
@@ -176,7 +181,8 @@ def test_promise_and_dispute_do_not_change_balance_or_holds(client, db, unique_e
     assert "dispute_recorded" in actions
 
     preview = client.get("/api/v1/collections/reminders/preview")
-    assert preview.status_code == 501
+    assert preview.status_code == 200
+    assert preview.json()["data"]["sends_customer_email"] is False
 
 
 def test_mock_inbox_dedupe_suggestion_and_tenant_isolation(client, db, unique_email):

@@ -46,7 +46,16 @@ def case_payload(case: CollectionCase, invoice: Invoice) -> dict:
     }
 
 
-def promise_payload(promise: PaymentPromise) -> dict:
+def scheduling_effect_for_invoice(db: Session, tenant_id, invoice_id) -> str:
+    from uuid import UUID
+
+    from app.modules.collections.repository import active_hold_count
+
+    iid = invoice_id if isinstance(invoice_id, UUID) else UUID(str(invoice_id))
+    return "hold_active" if active_hold_count(db, tenant_id, iid) > 0 else "routine_may_apply"
+
+
+def promise_payload(db: Session, promise: PaymentPromise) -> dict:
     return {
         "id": str(promise.id),
         "invoice_id": str(promise.invoice_id),
@@ -58,11 +67,11 @@ def promise_payload(promise: PaymentPromise) -> dict:
         "note": promise.note,
         "recorded_by": str(promise.recorded_by),
         "confirmed_by": str(promise.confirmed_by) if promise.confirmed_by else None,
-        "scheduling_effect": "NOT_IMPLEMENTED",
+        "scheduling_effect": scheduling_effect_for_invoice(db, promise.tenant_id, promise.invoice_id),
     }
 
 
-def dispute_payload(dispute: Dispute) -> dict:
+def dispute_payload(db: Session, dispute: Dispute) -> dict:
     return {
         "id": str(dispute.id),
         "invoice_id": str(dispute.invoice_id),
@@ -74,5 +83,5 @@ def dispute_payload(dispute: Dispute) -> dict:
         "recorded_by": str(dispute.recorded_by),
         "confirmed_by": str(dispute.confirmed_by) if dispute.confirmed_by else None,
         "resolved_by": str(dispute.resolved_by) if dispute.resolved_by else None,
-        "scheduling_effect": "NOT_IMPLEMENTED",
+        "scheduling_effect": scheduling_effect_for_invoice(db, dispute.tenant_id, dispute.invoice_id),
     }

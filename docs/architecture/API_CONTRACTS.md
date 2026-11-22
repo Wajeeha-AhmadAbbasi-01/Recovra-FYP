@@ -55,7 +55,8 @@ Session required. Tenant comes from the session user. Both `owner` and `finance_
 | POST | `/api/v1/collections/invoices/{id}/disputes` | Unconfirmed record does not create a hold |
 | PATCH | `/api/v1/collections/disputes/{id}` | Explicit status transition |
 | GET | `/api/v1/collections/invoices/{id}/timeline` | Audit rows for that invoice |
-| GET | `/api/v1/collections/reminders/preview` | **501** not implemented. Sends nothing |
+| GET | `/api/v1/collections/reminders/preview` | Read-only staff-task scheduling preview. **Sends nothing** |
+| POST | `/api/v1/collections/reminders/run` | Idempotent RULE reminder task cycle for tenant. **Sends nothing** |
 
 ## Inbox (Module 2, Phase 1, mock only)
 

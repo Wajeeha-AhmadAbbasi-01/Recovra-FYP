@@ -146,7 +146,7 @@ def post_promise(
     promise = service.record_promise(db, user, invoice_id, payload, _correlation())
     db.commit()
     db.refresh(promise)
-    return success(promise_payload(promise))
+    return success(promise_payload(db, promise))
 
 
 @router.patch("/promises/{promise_id}", response_model=ApiResponse[dict])
@@ -159,7 +159,7 @@ def patch_promise(
     promise = service.transition_promise(db, user, promise_id, payload, _correlation())
     db.commit()
     db.refresh(promise)
-    return success(promise_payload(promise))
+    return success(promise_payload(db, promise))
 
 
 @router.post("/invoices/{invoice_id}/disputes", response_model=ApiResponse[dict], status_code=status.HTTP_201_CREATED)
@@ -172,7 +172,7 @@ def post_dispute(
     dispute = service.record_dispute(db, user, invoice_id, payload, _correlation())
     db.commit()
     db.refresh(dispute)
-    return success(dispute_payload(dispute))
+    return success(dispute_payload(db, dispute))
 
 
 @router.patch("/disputes/{dispute_id}", response_model=ApiResponse[dict])
@@ -185,7 +185,7 @@ def patch_dispute(
     dispute = service.transition_dispute(db, user, dispute_id, payload, _correlation())
     db.commit()
     db.refresh(dispute)
-    return success(dispute_payload(dispute))
+    return success(dispute_payload(db, dispute))
 
 
 @router.get("/invoices/{invoice_id}/timeline", response_model=ApiResponse[dict])
@@ -214,11 +214,41 @@ def get_timeline(
     return success({"items": items, "page": page, "page_size": page_size, "total": total})
 
 
-@router.get("/reminders/preview")
-def reminder_preview(user: User = Depends(get_current_user)) -> None:
-    _ = user
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Reminder preview is not implemented. No customer message is sent.",
+@router.get("/reminders/preview", response_model=ApiResponse[dict])
+def reminder_preview(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ApiResponse[dict]:
+    from app.modules.collections import reminder_cycle
+
+    items = reminder_cycle.preview_tenant_reminders(db, user.tenant_id)
+    return success(
+        {
+            "items": items,
+            "sends_customer_email": False,
+            "note": "Staff-task scheduling preview only; not FBR or payment verification.",
+        }
+    )
+
+
+@router.post("/reminders/run", response_model=ApiResponse[dict])
+def run_reminders(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ApiResponse[dict]:
+    from app.modules.collections import reminder_cycle
+
+    result = reminder_cycle.run_tenant_reminder_cycle(db, user.tenant_id, correlation_id=str(uuid.uuid4()))
+    db.commit()
+    return success(
+        {
+            "evaluated": result.evaluated,
+            "tasks_created": result.created,
+            "skipped": result.skipped,
+            "expired_promises": result.expired_promises,
+            "as_of": result.as_of.isoformat(),
+            "policy_version": result.policy_version,
+            "sends_customer_email": False,
+        }
     )
 

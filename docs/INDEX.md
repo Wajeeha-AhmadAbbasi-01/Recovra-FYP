@@ -43,7 +43,9 @@
 ## Module 2 phase record
 
 - [phases/MODULE_2_PHASE_1_REPORT.md](phases/MODULE_2_PHASE_1_REPORT.md) (closed)
+- [phases/MODULE_2_PHASE_2_REPORT.md](phases/MODULE_2_PHASE_2_REPORT.md) (closed)
 - [handoffs/MODULE_2_PHASE_1_TO_2.md](handoffs/MODULE_2_PHASE_1_TO_2.md)
+- [handoffs/MODULE_2_PHASE_2_TO_3.md](handoffs/MODULE_2_PHASE_2_TO_3.md)
 
 ## Testing
 

@@ -19,6 +19,7 @@ from app.modules.collections.models import (
     TaskSource,
     TaskStatus,
 )
+from app.modules.collections import holds
 from app.modules.collections.schemas import DisputeCreate, DisputePatch, PromiseCreate, PromisePatch, TaskCreate, TaskPatch
 from app.modules.invoices.aging import today_karachi
 from app.modules.invoices.models import Invoice
@@ -235,6 +236,9 @@ def transition_promise(db: Session, user: User, promise_id: uuid.UUID, payload: 
     promise.status = payload.status
     if payload.status == PromiseStatus.CONFIRMED:
         promise.confirmed_by = user.id
+        holds.on_promise_confirmed(db, user.id, promise, correlation_id)
+    elif payload.status in {PromiseStatus.CANCELLED, PromiseStatus.FULFILLED, PromiseStatus.EXPIRED}:
+        holds.on_promise_terminal(db, user.id, promise, correlation_id)
     _audit(
         db,
         user,
@@ -289,9 +293,13 @@ def transition_dispute(db: Session, user: User, dispute_id: uuid.UUID, payload: 
     dispute.status = payload.status
     if payload.status == DisputeStatus.CONFIRMED:
         dispute.confirmed_by = user.id
+        holds.on_dispute_confirmed(db, user.id, dispute, correlation_id)
     if payload.status == DisputeStatus.RESOLVED:
         dispute.resolved_by = user.id
         dispute.resolution_note = payload.resolution_note
+        holds.on_dispute_resolved_or_cancelled(db, user.id, dispute, correlation_id)
+    elif payload.status == DisputeStatus.CANCELLED:
+        holds.on_dispute_resolved_or_cancelled(db, user.id, dispute, correlation_id)
     _audit(
         db,
         user,

@@ -158,7 +158,7 @@ class Dispute(Base):
 
 
 class ReminderHold(Base):
-    """Schema only in Phase 1. No API inserts holds until Phase 2."""
+    """Active holds pause routine RULE reminder task creation for an invoice."""
 
     __tablename__ = "reminder_holds"
 

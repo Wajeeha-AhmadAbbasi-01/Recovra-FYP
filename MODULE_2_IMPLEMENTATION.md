@@ -4,7 +4,7 @@
 
 - Branch: `module-2.1-ghazia`
 - Date: 2026-11-22
-- Phase: **1 closed and approved (2026-11-22).** Phase 2 **authorized** (Student 1). Phase 3 not started.
+- Phase: **2 closed and approved (2026-11-22).** Phase **3 authorized** (UI + IMAP). No Phase 3 code yet.
 - Migration `c2a91f0m2p1`: **applied** on team Supabase via `alembic upgrade head` (2026-11-22).
 - Live IMAP: **not implemented.** No customer email is sent.
 - Phase 1 verification: automated **5 passed**; manual Swagger checklist **10/10** (see phase report).
@@ -83,29 +83,28 @@ Dispute: `OPEN` → `CONFIRMED` or `CANCELLED`. `CONFIRMED` → `RESOLVED`.
 
 ### Purpose and exact business rule
 
-**NOT IMPLEMENTED.** Approved default, not executed: a routine task would be due the first `Asia/Karachi` day after `due_date` when the invoice is active, outstanding is greater than zero, due date is set, and no effective hold exists. Phase 1 does not run that rule.
+### Purpose and exact business rule
+
+First eligible Karachi day = `due_date + grace_days + 1`. Creates a **staff** `RULE` task of type `REMINDER` when invoice is `active`, `outstanding_amount > 0`, due date set, policy enabled, no **active** `reminder_hold`. Does **not** send customer email.
 
 ### Actual files and functions/classes
 
 | Concern | Actual location | Function/class or endpoint | What it does |
 |---|---|---|---|
 | Frontend | NOT IMPLEMENTED | | |
-| API | `backend/app/modules/collections/router.py` | `reminder_preview` | Returns 501 |
-| Rules/services | NOT IMPLEMENTED | | |
-| Model/migration | `ReminderPolicy`, `FollowUpTask.dedupe_key` | stored only | Policy row is not inserted by an API |
-| Tests | `test_promise_and_dispute_do_not_change_balance_or_holds` | preview status 501 | |
+| API | `collections/router.py` | `run_reminders`, `reminder_preview` | Run cycle / preview |
+| Rules | `collections/rules/eligibility.py` | `evaluate_routine_reminder`, `routine_reminder_dedupe_key` | Pure eligibility |
+| Scheduler | `collections/reminder_cycle.py` | `run_tenant_reminder_cycle`, `create_routine_task_if_eligible` | Idempotent task insert |
+| Policy | `collections/policy.py` | `ensure_reminder_policy` | `m2-phase2-v1` |
+| Tests | `test_collections_phase2.py`, `test_collections_rules.py` | idempotency, hold skip | |
 
 ### Trigger/cadence and idempotency
 
-No scheduler. Dedupe unique key exists for a later worker. Staff tasks use `staff:<uuid>` and are not reminder cycles.
-
-### Data flow / state transitions
-
-None for automatic tasks.
+`POST /api/v1/collections/reminders/run` per tenant session. Dedupe key `rule:{policy_version}:routine:{invoice_id}:{due_date}`. Repeat run → `tasks_created: 0`.
 
 ### Status / known limitations
 
-`BLOCKED` on Phase 2. No email is sent.
+No background worker. Operator cron may call run endpoint. No email is sent.
 
 ## 6. Feature 2: Follow-up task management
 
@@ -143,69 +142,51 @@ Backend list/detail/patch works. UI is Phase 3.
 
 ### Purpose and exact business rule
 
-Staff record a date they chose. The API does not parse phrases such as “Friday”. Confirming a promise does not create a hold in Phase 1. Invoice balance is unchanged. **Proposal rule deferred:** hold routine reminders until follow-up date.
+Staff record a date they chose; no NLP. **CONFIRMED** creates `CONFIRMED_PROMISE` hold and sets `follow_up_date` to `promised_date` if missing. Invoice balance unchanged. Expired promises on cycle run → `EXPIRED` + hold released.
 
 ### Actual files and functions/classes
 
 | Concern | Actual location | Function/class or endpoint | What it does |
 |---|---|---|---|
-| Frontend | NOT IMPLEMENTED | | |
-| API | `router.post_promise`, `router.patch_promise` | | |
-| Rules/services | `service.record_promise`, `service.transition_promise` | Persist and transition | |
-| Model/migration | `PaymentPromise` | | |
-| Tests | `test_promise_and_dispute_do_not_change_balance_or_holds` | Amount over outstanding is 422; hold count stays 0 | |
-
-### Trigger/cadence and idempotency
-
-Manual. No automatic promise from email.
-
-### Data flow / state transitions
-
-`RECORDED` on create. Confirm sets `confirmed_by`. Response field `scheduling_effect` is `NOT_IMPLEMENTED`.
+| Holds | `collections/holds.py` | `on_promise_confirmed`, `on_promise_terminal` | Active hold rows |
+| Service | `collections/service.py` | `transition_promise` | Wires holds |
+| Present | `collections/present.py` | `scheduling_effect_for_invoice` | `hold_active` / `routine_may_apply` |
+| Tests | `test_collections_phase1.py`, `test_collections_phase2.py` | active holds, multi-hold | |
 
 ### Status / known limitations
 
-Hold, expiry job, and follow-up task generation are Phase 2.
+Does not mark invoice paid. UI deferred to Phase 3.
 
 ## 8. Feature 4: Dispute management
 
 ### Purpose and exact business rule
 
-Staff record a reason and optional challenged amount. Confirm does not pause reminders in Phase 1. Resolve stores `resolved_by` and optional `resolution_note`. Rows are not deleted.
+**CONFIRMED** creates `CONFIRMED_DISPUTE` hold (preview **SKIP** / `active_reminder_hold`). **RESOLVED** or **CANCELLED** releases that hold only. Other active holds remain.
 
 ### Actual files and functions/classes
 
 | Concern | Actual location | Function/class or endpoint | What it does |
 |---|---|---|---|
-| Frontend | NOT IMPLEMENTED | | |
-| API | `router.post_dispute`, `router.patch_dispute` | | |
-| Rules/services | `service.record_dispute`, `service.transition_dispute` | | |
-| Model/migration | `Dispute`, `ReminderHold` | Hold table unused | |
-| Tests | same promise/dispute test | Confirmed dispute, zero holds, balance unchanged | |
-
-### Status / known limitations
-
-Multi-hold precedence is Phase 2.
+| Holds | `collections/holds.py` | `on_dispute_confirmed`, `on_dispute_resolved_or_cancelled` | |
+| Tests | `test_collections_phase2.py` | `test_hold_blocks_new_rule_task`, multi-hold | |
 
 ## 9. Feature 5: Rule-based reminder scheduling
 
 ### Purpose and exact business rule
 
-**NOT IMPLEMENTED.** Stored policy defaults, not applied: `enabled=false`, `grace_days=0`, timezone `Asia/Karachi`, risk `STANDARD`, version `m2-phase1-unscheduled`. No weekend or holiday rule.
+Policy defaults: `enabled=true`, `grace_days=0`, `Asia/Karachi`, `STANDARD` risk, version `m2-phase2-v1`. Preview lists per-invoice `decision`, `reason`, `would_create_task`, `sends_customer_email: false`.
 
 ### Actual files and functions/classes
 
 | Concern | Actual location | Function/class or endpoint | What it does |
 |---|---|---|---|
-| Frontend | NOT IMPLEMENTED | | |
-| API | `reminder_preview` | HTTP 501 | |
-| Rules/services | NOT IMPLEMENTED | | |
-| Model/migration | `ReminderPolicy` | defaults only | |
-| Tests | preview assertion | 501 | |
+| API | `router.reminder_preview` | GET preview | |
+| Rules | `rules/eligibility.py` | `evaluate_routine_reminder` | |
+| Cycle | `reminder_cycle.py` | `preview_tenant_reminders` | |
 
 ### Status / known limitations
 
-`NOT IMPLEMENTED`.
+No weekend/holiday rules. Risk does not change cadence yet.
 
 ## 10. Feature 6: Follow-up history and audit log
 
@@ -250,15 +231,16 @@ Mock ingest only. Identity is `(tenant, mailbox, folder, uidvalidity, uid)`. RFC
 
 ## 12. Business-state and priority rules
 
-| State | Phase 1 behavior |
+| State | Behavior (after Phase 2) |
 |---|---|
 | Invoice overdue / unpaid | Unchanged by Module 2 |
+| RULE task created | Staff reminder only; no email |
 | Task completed | Task only |
-| Promise confirmed | Status only. No hold |
-| Dispute confirmed | Status only. No hold |
-| Two holds | Table exists. No writer |
+| Promise confirmed | Active promise hold; routine RULE tasks skipped |
+| Dispute confirmed | Active dispute hold; preview SKIP `active_reminder_hold` |
+| Resolve dispute | Release dispute hold; promise hold may remain |
 | Suggested mail link | Not financial truth |
-| Claimed payment | Not a status. Staff may create `PAYMENT_VERIFICATION` manually. Balance unchanged |
+| Claimed payment | Does not change `outstanding_amount` |
 
 ## 13. End-to-end local runbook
 
@@ -266,7 +248,7 @@ Backend and frontend launch commands are in `README.md`. This phase adds no new 
 
 ```powershell
 cd backend
-python -m pytest tests/test_collections_phase1.py -q
+python -m pytest tests/test_collections_rules.py tests/test_collections_phase1.py tests/test_collections_phase2.py -q
 ```
 
 Env name only: `IMAP_ENABLED=false`. Do not set mailbox passwords in git.
@@ -278,9 +260,11 @@ Env name only: `IMAP_ENABLED=false`. Do not set mailbox passwords in git.
 | Command | Date | Result |
 |---|---|---|
 | `python -m pytest tests/test_collections_phase1.py -q` | 2026-11-22 | **5 passed** |
-| Manual Swagger Phase 1 checklist | 2026-11-22 | **10/10 passed** (team) |
+| `python -m pytest tests/test_collections_rules.py tests/test_collections_phase1.py tests/test_collections_phase2.py -q` | 2026-11-22 | **11 passed** |
+| Manual Swagger Phase 1 checklist | 2026-11-22 | **10/10 passed** |
+| Manual Swagger Phase 2 checks | 2026-11-22 | **Passed** (hold preview, idempotent run, no send) |
 
-Full backend `tests/` suite: **NOT RUN** at Phase 1 close (run before Phase 2 handoff if policy requires).
+Full backend `tests/` suite: **NOT RUN** (Module 1 regression separate).
 
 ## 15. Security, permissions, tenant isolation and data protection
 
@@ -294,10 +278,11 @@ Full backend `tests/` suite: **NOT RUN** at Phase 1 close (run before Phase 2 ha
 ## 16. Phase handoffs and explicit approvals
 
 - Gate 0: approved 2026-11-22.
-- Phase 1: **closed and approved** 2026-11-22 (automated + Swagger manual).
-- Phase 2: **authorized** for Student 1.
+- Phase 1: **closed and approved** 2026-11-22.
+- Phase 2: **closed and approved** 2026-11-22.
+- Phase 3: **authorized** 2026-11-22.
 
-**Handoff:** `docs/handoffs/MODULE_2_PHASE_1_TO_2.md`. Implement rules engine, scheduler, holds; stop at Phase 2 gate before Phase 3.
+**Handoff:** `docs/handoffs/MODULE_2_PHASE_2_TO_3.md`. UI + IMAP; stop at Module 2 acceptance gate.
 
 ## 17. Future AI integration contract (not yet implemented)
 
@@ -305,9 +290,8 @@ Inbound text and promise notes are stored for staff. Nothing classifies Urdu, Ro
 
 ## 18. Known limitations and next steps
 
-- No automatic tasks, holds, or scheduler.
-- Preview is 501.
+- No collections/inbox UI (Phase 3).
+- No live IMAP.
+- No Celery worker (manual/cron `POST /reminders/run`).
 - Timeline filter is in application memory.
-- Frontend has no collections or inbox routes.
-- Postgres revision is unapplied.
-- `ACCEPT MODULE 1` is still unrecorded in `docs/handoffs/CURRENT_STATE.md`.
+- **Next:** Phase 3 UI and optional live IMAP (`docs/handoffs/MODULE_2_PHASE_2_TO_3.md`).

@@ -66,12 +66,16 @@ def case_for_tenant(db: Session, tenant_id: uuid.UUID, case_id: uuid.UUID) -> Co
     return row
 
 
-def hold_count(db: Session, tenant_id: uuid.UUID, invoice_id: uuid.UUID) -> int:
+def active_hold_count(db: Session, tenant_id: uuid.UUID, invoice_id: uuid.UUID) -> int:
     return int(
         db.scalar(
             select(func.count())
             .select_from(ReminderHold)
-            .where(ReminderHold.tenant_id == tenant_id, ReminderHold.invoice_id == invoice_id)
+            .where(
+                ReminderHold.tenant_id == tenant_id,
+                ReminderHold.invoice_id == invoice_id,
+                ReminderHold.active.is_(True),
+            )
         )
         or 0
     )

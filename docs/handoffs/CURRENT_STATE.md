@@ -2,34 +2,43 @@
 
 **Module:** 2 — Collections workflow, reminder scheduling, inbound email  
 **Branch:** `module-2.1-ghazia`  
-**Active phase:** **2** — rules engine, scheduler, holds (Student 1)  
-**Phase 1:** closed and approved (2026-11-22)
+**Active phase:** **3** — frontend + mock/live inbox integration (authorized)  
+**Phase 1:** closed and approved (2026-11-22)  
+**Phase 2:** closed and approved (2026-11-22)  
+**Owner:** Student 3 (UI); Student 2 owns live IMAP backend in Phase 3
 
 ## Approved gates
 
 | Gate | Status |
 |------|--------|
-| Gate 0 (Module 2 architecture) | Approved 2026-11-22 |
-| Phase 1 implementation + tests + Swagger manual pass | **Approved / closed** 2026-11-22 |
-| Phase 2 work (Student 1) | **Authorized** — do not start Phase 3 or live IMAP yet |
-| Live IMAP / customer email | Not authorized (Phase 3 + separate mailbox approval) |
+| Gate 0 | Approved 2026-11-22 |
+| Phase 1 | Closed / approved |
+| Phase 2 | Closed / approved |
+| Phase 3 | **Authorized** — do not implement AI Module or customer email |
+| Live IMAP mailbox | Requires separate operator approval before production poll |
 
 ## Database
 
-- Alembic head **`c2a91f0m2p1`** applied on team **Supabase** Postgres (2026-11-22).
-- Other clones must run `alembic upgrade head` against their own `DATABASE_URL`.
+- Team **Supabase** at Alembic **`c2a91f0m2p1`**.
 
-## What works (Phase 1 baseline)
+## Working (Phases 1–2)
 
-- `/api/v1/collections/*` — tasks, cases, promises, disputes, timeline (session, tenant-scoped).
-- `/api/v1/inbox/*` — mock deliver, messages, link decisions; no send.
-- Module 1 dashboard, invoices, imports unchanged in scope.
-- Reference: `MODULE_2_IMPLEMENTATION.md`, `docs/phases/MODULE_2_PHASE_1_REPORT.md`.
+- Collections CRUD, promises, disputes, timeline, audit.
+- Mock inbox ingest and invoice links.
+- Rule eligibility, holds, idempotent `POST /api/v1/collections/reminders/run`, `GET .../reminders/preview`.
+- Reference: `MODULE_2_IMPLEMENTATION.md`.
 
-## Next (Phase 2 only)
+## Not yet (Phase 3)
 
-Student 1: eligibility/rules service, idempotent scheduler job, promise/dispute hold + follow-up dates, tests, update `MODULE_2_IMPLEMENTATION.md`. Stop at Phase 2 gate before UI or live IMAP.
+- Collections Overview, Tasks, Promise/Dispute UI, Timeline, Inbox pages.
+- Live IMAP adapter (mock remains default).
+- Formal `ACCEPT MODULE 2` after Phase 3 complete.
 
-## Handoff doc
+## Next
 
-`docs/handoffs/MODULE_2_PHASE_1_TO_2.md`
+Student 3: wire UI to existing APIs. Student 2: IMAP when mailbox approved. Stop at Phase 3 gate.
+
+## Handoffs
+
+- [MODULE_2_PHASE_1_TO_2.md](MODULE_2_PHASE_1_TO_2.md) (historical)
+- Phase 2 report: [../phases/MODULE_2_PHASE_2_REPORT.md](../phases/MODULE_2_PHASE_2_REPORT.md)
