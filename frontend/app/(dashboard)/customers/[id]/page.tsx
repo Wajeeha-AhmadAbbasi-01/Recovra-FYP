@@ -95,7 +95,7 @@ export default function CustomerDetailPage() {
             <EmptyState title="No invoices for this customer." />
           </div>
         ) : (
-          <motion-div className="mt-4">
+          <div className="mt-4">
             <DataTable>
               <DataTableHead>
                 <DataTableRow>
@@ -136,7 +136,7 @@ export default function CustomerDetailPage() {
                 ))}
               </DataTableBody>
             </DataTable>
-          </motion-div>
+          </div>
         )}
       </Card>
 

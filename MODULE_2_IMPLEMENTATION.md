@@ -4,7 +4,7 @@
 
 - Branch: `module-2.1-ghazia`
 - Date: 2026-11-22
-- Phase: **2 closed and approved (2026-11-22).** Phase **3 authorized** (UI + IMAP). No Phase 3 code yet.
+- Phase: **3 in progress (2026-11-22).** Frontend wired to collections/inbox APIs; live IMAP still not implemented.
 - Migration `c2a91f0m2p1`: **applied** on team Supabase via `alembic upgrade head` (2026-11-22).
 - Live IMAP: **not implemented.** No customer email is sent.
 - Phase 1 verification: automated **5 passed**; manual Swagger checklist **10/10** (see phase report).
@@ -290,7 +290,7 @@ Inbound text and promise notes are stored for staff. Nothing classifies Urdu, Ro
 
 ## 18. Known limitations and next steps
 
-- No collections/inbox UI (Phase 3).
+- Collections/inbox UI: initial slice (`frontend/app/(dashboard)/collections`, `inbox`, invoice collections card); polish + confirm flows remain.
 - No live IMAP.
 - No Celery worker (manual/cron `POST /reminders/run`).
 - Timeline filter is in application memory.

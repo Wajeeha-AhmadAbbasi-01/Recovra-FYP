@@ -45,6 +45,26 @@ def task_for_tenant(db: Session, tenant_id: uuid.UUID, task_id: uuid.UUID) -> Fo
     return row
 
 
+def promises_for_invoice(db: Session, tenant_id: uuid.UUID, invoice_id: uuid.UUID) -> list[PaymentPromise]:
+    return list(
+        db.scalars(
+            select(PaymentPromise)
+            .where(PaymentPromise.tenant_id == tenant_id, PaymentPromise.invoice_id == invoice_id)
+            .order_by(PaymentPromise.created_at.desc())
+        ).all()
+    )
+
+
+def disputes_for_invoice(db: Session, tenant_id: uuid.UUID, invoice_id: uuid.UUID) -> list[Dispute]:
+    return list(
+        db.scalars(
+            select(Dispute)
+            .where(Dispute.tenant_id == tenant_id, Dispute.invoice_id == invoice_id)
+            .order_by(Dispute.created_at.desc())
+        ).all()
+    )
+
+
 def promise_for_tenant(db: Session, tenant_id: uuid.UUID, promise_id: uuid.UUID) -> PaymentPromise | None:
     row = db.get(PaymentPromise, promise_id)
     if row is None or row.tenant_id != tenant_id:

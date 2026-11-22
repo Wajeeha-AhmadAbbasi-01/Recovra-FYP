@@ -61,6 +61,90 @@ export const api = {
   acceptInvitation: (body: { token: string; full_name: string; password: string }) =>
     json("/api/v1/team/invitations/accept", { method: "POST", body: JSON.stringify(body) }),
 
+  invoice: (id: string) => json<Record<string, unknown>>(`/api/v1/invoices/${id}`),
+
+  collectionTasks: (params?: { status?: string; overdue?: boolean }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.overdue) qs.set("overdue", "true");
+    const tail = qs.toString() ? `?${qs}` : "";
+    return json<{ items: Array<Record<string, unknown>>; total: number }>(`/api/v1/collections/tasks${tail}`);
+  },
+
+  collectionTask: (id: string) => json<Record<string, unknown>>(`/api/v1/collections/tasks/${id}`),
+
+  patchCollectionTask: (id: string, body: Record<string, unknown>) =>
+    json<Record<string, unknown>>(`/api/v1/collections/tasks/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  createCollectionTask: (body: Record<string, unknown>) =>
+    json<Record<string, unknown>>("/api/v1/collections/tasks", { method: "POST", body: JSON.stringify(body) }),
+
+  reminderPreview: () =>
+    json<{ items: Array<Record<string, unknown>>; sends_customer_email: boolean; note?: string }>(
+      "/api/v1/collections/reminders/preview",
+    ),
+
+  runReminders: () =>
+    json<Record<string, unknown>>("/api/v1/collections/reminders/run", { method: "POST", body: "{}" }),
+
+  invoiceTimeline: (invoiceId: string) =>
+    json<{ items: Array<Record<string, unknown>> }>(`/api/v1/collections/invoices/${invoiceId}/timeline`),
+
+  invoicePromises: (invoiceId: string) =>
+    json<{ items: Array<Record<string, unknown>>; total: number }>(
+      `/api/v1/collections/invoices/${invoiceId}/promises`,
+    ),
+
+  invoiceDisputes: (invoiceId: string) =>
+    json<{ items: Array<Record<string, unknown>>; total: number }>(
+      `/api/v1/collections/invoices/${invoiceId}/disputes`,
+    ),
+
+  createPromise: (invoiceId: string, body: Record<string, unknown>) =>
+    json<Record<string, unknown>>(`/api/v1/collections/invoices/${invoiceId}/promises`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  patchPromise: (promiseId: string, body: Record<string, unknown>) =>
+    json<Record<string, unknown>>(`/api/v1/collections/promises/${promiseId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  createDispute: (invoiceId: string, body: Record<string, unknown>) =>
+    json<Record<string, unknown>>(`/api/v1/collections/invoices/${invoiceId}/disputes`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  patchDispute: (disputeId: string, body: Record<string, unknown>) =>
+    json<Record<string, unknown>>(`/api/v1/collections/disputes/${disputeId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  inboxStatus: () => json<Record<string, unknown>>("/api/v1/inbox/mailbox/status"),
+
+  inboxMessages: () => json<{ items: Array<Record<string, unknown>>; total: number }>("/api/v1/inbox/messages"),
+
+  inboxMessage: (id: string) => json<Record<string, unknown>>(`/api/v1/inbox/messages/${id}`),
+
+  confirmInboxLink: (messageId: string, body: { invoice_id: string; action: "confirm" | "reject" }) =>
+    json<Record<string, unknown>>(`/api/v1/inbox/messages/${messageId}/links`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  mockInboxDeliver: (body: { messages: Array<Record<string, unknown>> }) =>
+    json<Record<string, unknown>>("/api/v1/inbox/mailbox/mock-deliver", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   uploadPdfs: async (files: FileList): Promise<ApiResult<{ results: Array<Record<string, unknown>> }>> => {
     const form = new FormData();
     Array.from(files).forEach((file) => form.append("files", file));

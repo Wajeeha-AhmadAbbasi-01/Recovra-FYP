@@ -28,15 +28,14 @@
 - Rule eligibility, holds, idempotent `POST /api/v1/collections/reminders/run`, `GET .../reminders/preview`.
 - Reference: `MODULE_2_IMPLEMENTATION.md`.
 
-## Not yet (Phase 3)
+## Phase 3 (UI complete)
 
-- Collections Overview, Tasks, Promise/Dispute UI, Timeline, Inbox pages.
-- Live IMAP adapter (mock remains default).
-- Formal `ACCEPT MODULE 2` after Phase 3 complete.
+- Collections, inbox, invoice promise/dispute confirm-resolve, manual FOLLOW_UP tasks, inbox SUGGESTED → CONFIRMED.
+- **Open:** Team E2E per `docs/phases/MODULE_2_PHASE_3_REPORT.md`; formal `ACCEPT MODULE 2`. Live IMAP still separate.
 
 ## Next
 
-Student 3: wire UI to existing APIs. Student 2: IMAP when mailbox approved. Stop at Phase 3 gate.
+Run Phase 3 E2E checklist; gate Module 2. IMAP only when mailbox approved.
 
 ## Handoffs
 

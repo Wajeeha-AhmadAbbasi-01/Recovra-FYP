@@ -50,8 +50,10 @@ Session required. Tenant comes from the session user. Both `owner` and `finance_
 | PATCH | `/api/v1/collections/tasks/{id}` | Assignment and allowed status transitions |
 | GET | `/api/v1/collections/cases` | `status`, `customer`, `page`, `page_size` |
 | GET | `/api/v1/collections/cases/{id}` | |
+| GET | `/api/v1/collections/invoices/{id}/promises` | List for invoice detail UI |
 | POST | `/api/v1/collections/invoices/{id}/promises` | Staff-selected date. No hold |
 | PATCH | `/api/v1/collections/promises/{id}` | Explicit status transition |
+| GET | `/api/v1/collections/invoices/{id}/disputes` | List for invoice detail UI |
 | POST | `/api/v1/collections/invoices/{id}/disputes` | Unconfirmed record does not create a hold |
 | PATCH | `/api/v1/collections/disputes/{id}` | Explicit status transition |
 | GET | `/api/v1/collections/invoices/{id}/timeline` | Audit rows for that invoice |

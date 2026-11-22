@@ -136,6 +136,18 @@ def get_case(
     return success(case_payload(case, invoice))
 
 
+@router.get("/invoices/{invoice_id}/promises", response_model=ApiResponse[dict])
+def list_promises(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ApiResponse[dict]:
+    if repo.invoice_for_tenant(db, user.tenant_id, invoice_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+    rows = repo.promises_for_invoice(db, user.tenant_id, invoice_id)
+    return success({"items": [promise_payload(db, row) for row in rows], "total": len(rows)})
+
+
 @router.post("/invoices/{invoice_id}/promises", response_model=ApiResponse[dict], status_code=status.HTTP_201_CREATED)
 def post_promise(
     invoice_id: UUID,
@@ -160,6 +172,18 @@ def patch_promise(
     db.commit()
     db.refresh(promise)
     return success(promise_payload(db, promise))
+
+
+@router.get("/invoices/{invoice_id}/disputes", response_model=ApiResponse[dict])
+def list_disputes(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ApiResponse[dict]:
+    if repo.invoice_for_tenant(db, user.tenant_id, invoice_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+    rows = repo.disputes_for_invoice(db, user.tenant_id, invoice_id)
+    return success({"items": [dispute_payload(db, row) for row in rows], "total": len(rows)})
 
 
 @router.post("/invoices/{invoice_id}/disputes", response_model=ApiResponse[dict], status_code=status.HTTP_201_CREATED)

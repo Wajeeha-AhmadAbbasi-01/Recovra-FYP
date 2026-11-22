@@ -53,20 +53,20 @@ python -m pytest tests -q
 
 Integration tests use in-memory SQLite unless `DATABASE_URL` is set.
 
-## Module 2 (Phase 1 backend only)
+## Module 2 (collections + inbox)
 
-Collections and a mock inbox are available on the API. They do not send email and do not change invoice balances. Live IMAP and reminder scheduling are not implemented. `IMAP_ENABLED` stays `false`.
+Backend: tasks, promises, disputes, timeline, rule-based reminder cycle (staff tasks only), mock inbox ingest. **No customer email.** Invoice balances are unchanged by collections actions. Live IMAP remains opt-in (`IMAP_ENABLED=false` by default).
 
-The schema revision `backend/alembic/versions/c2a91f0m2p1_module2_collections.py` is written and **not applied**. Do not run `alembic upgrade` until that command is separately approved. SQLite tests create tables from models and do not use that migration.
+Frontend (Phase 3): **Collections** (`/collections`, `/collections/tasks/[id]`), **Inbox** (`/inbox`, `/inbox/[id]`), promise/dispute + timeline on **invoice detail**.
 
-Focused check:
+Migration `c2a91f0m2p1` on team Supabase — run `alembic upgrade head` from `backend/` when your DB is behind.
 
 ```powershell
 cd backend
-python -m pytest tests/test_collections_phase1.py -q
+python -m pytest tests/test_collections_rules.py tests/test_collections_phase1.py tests/test_collections_phase2.py -q
 ```
 
-See `MODULE_2_IMPLEMENTATION.md` for endpoints and limits.
+See `MODULE_2_IMPLEMENTATION.md` and `docs/handoffs/CURRENT_STATE.md`.
 
 ## Compliance note
 

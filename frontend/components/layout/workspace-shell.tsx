@@ -13,6 +13,8 @@ const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: NavIconDashboard },
   { href: "/imports", label: "Imports", icon: NavIconImports },
   { href: "/invoices", label: "Invoices", icon: NavIconInvoices },
+  { href: "/collections", label: "Collections", icon: NavIconCollections },
+  { href: "/inbox", label: "Inbox", icon: NavIconInbox },
   { href: "/customers", label: "Customers", icon: NavIconCustomers },
   { href: "/team", label: "Team", icon: NavIconTeam, ownerOnly: true },
 ] as const;
@@ -200,6 +202,20 @@ function NavIconTeam() {
   return (
     <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
       <path d="M9 11a3 3 0 100-6 3 3 0 000 6zm6 0a3 3 0 100-6 3 3 0 000 6zM3 20a6 6 0 0112 0M15 14a5 5 0 015 4" />
+    </svg>
+  );
+}
+function NavIconCollections() {
+  return (
+    <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    </svg>
+  );
+}
+function NavIconInbox() {
+  return (
+    <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+      <path d="M4 6h16v12H4V6zm0 0l8 6 8-6" />
     </svg>
   );
 }
