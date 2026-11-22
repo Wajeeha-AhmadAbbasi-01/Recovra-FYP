@@ -15,6 +15,8 @@ def log_event(
     entity_id: str | None,
     action: str,
     summary: dict[str, Any] | None = None,
+    origin: str | None = None,
+    correlation_id: str | None = None,
 ) -> None:
     db.add(
         AuditEvent(
@@ -24,5 +26,7 @@ def log_event(
             entity_id=entity_id,
             action=action,
             summary=summary or {},
+            origin=origin,
+            correlation_id=correlation_id,
         )
     )

@@ -5,7 +5,9 @@ from app.core.config import get_settings
 from app.modules.auth.router import router as auth_router
 from app.modules.customers.router import router as customers_router
 from app.modules.dashboard.router import router as dashboard_router
+from app.modules.collections.router import router as collections_router
 from app.modules.imports.router import router as imports_router
+from app.modules.inbox.router import router as inbox_router
 from app.modules.invoices.router import router as invoices_router
 from app.modules.team.router import router as team_router
 
@@ -27,6 +29,8 @@ app.include_router(customers_router)
 app.include_router(invoices_router)
 app.include_router(imports_router)
 app.include_router(dashboard_router)
+app.include_router(collections_router)
+app.include_router(inbox_router)
 
 
 @app.get("/api/v1/health")

@@ -154,6 +154,7 @@ activemq-data/
 .env
 .envrc
 .venv
+.pydeps
 env/
 venv/
 ENV/

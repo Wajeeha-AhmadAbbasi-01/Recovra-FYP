@@ -53,6 +53,21 @@ python -m pytest tests -q
 
 Integration tests use in-memory SQLite unless `DATABASE_URL` is set.
 
+## Module 2 (Phase 1 backend only)
+
+Collections and a mock inbox are available on the API. They do not send email and do not change invoice balances. Live IMAP and reminder scheduling are not implemented. `IMAP_ENABLED` stays `false`.
+
+The schema revision `backend/alembic/versions/c2a91f0m2p1_module2_collections.py` is written and **not applied**. Do not run `alembic upgrade` until that command is separately approved. SQLite tests create tables from models and do not use that migration.
+
+Focused check:
+
+```powershell
+cd backend
+python -m pytest tests/test_collections_phase1.py -q
+```
+
+See `MODULE_2_IMPLEMENTATION.md` for endpoints and limits.
+
 ## Compliance note
 
 UI and API labels describe **local format checks**. They do not certify FBR registration, payment, or tax compliance.

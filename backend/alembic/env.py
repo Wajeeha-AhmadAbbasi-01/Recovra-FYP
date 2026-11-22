@@ -6,7 +6,16 @@ from sqlalchemy import engine_from_config, pool
 from app.core.config import get_settings
 from app.db.base import Base
 from app.modules.audit.models import AuditEvent  # noqa: F401
+from app.modules.collections.models import (  # noqa: F401
+    CollectionCase,
+    Dispute,
+    FollowUpTask,
+    PaymentPromise,
+    ReminderHold,
+    ReminderPolicy,
+)
 from app.modules.customers.models import Customer  # noqa: F401
+from app.modules.inbox.models import InboundMessage, Mailbox, MessageInvoiceLink  # noqa: F401
 from app.modules.imports.models import Upload, ValidationAttempt  # noqa: F401
 from app.modules.invoices.models import Invoice, InvoiceItem  # noqa: F401
 from app.modules.team.models import TeamInvitation  # noqa: F401

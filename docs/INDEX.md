@@ -1,4 +1,4 @@
-# Recovra Module 1 — documentation index
+# Recovra documentation index
 
 ## Plans (repository root inputs)
 
@@ -8,7 +8,7 @@
 ## Architecture
 
 - [architecture/API_CONTRACTS.md](architecture/API_CONTRACTS.md)
-- [architecture/DATA_MODEL.md](architecture/DATA_MODEL.md)
+- [architecture/DATA_MODEL.md](architecture/DATA_MODEL.md) — Module 2 tables; Module 1 tables live in `backend/app/modules/`
 - [architecture/PERMISSIONS.md](architecture/PERMISSIONS.md)
 - [architecture/OVERVIEW.md](architecture/OVERVIEW.md)
 
@@ -34,9 +34,16 @@
 
 ## Modules
 
-- [modules/MODULE_01_INVOICE_INTAKE.md](modules/MODULE_01_INVOICE_INTAKE.md)
 - [modules/module-1/invoice-data-synchronization.md](modules/module-1/invoice-data-synchronization.md)
 - [modules/module-1/invoice-ingestion-v2.md](modules/module-1/invoice-ingestion-v2.md)
+- [modules/module-1/ui-ux-enhancements.md](modules/module-1/ui-ux-enhancements.md)
+- [modules/MODULE_02_COLLECTIONS.md](modules/MODULE_02_COLLECTIONS.md)
+- Root trace: [../MODULE_2_IMPLEMENTATION.md](../MODULE_2_IMPLEMENTATION.md)
+
+## Module 2 phase record
+
+- [phases/MODULE_2_PHASE_1_REPORT.md](phases/MODULE_2_PHASE_1_REPORT.md) (closed)
+- [handoffs/MODULE_2_PHASE_1_TO_2.md](handoffs/MODULE_2_PHASE_1_TO_2.md)
 
 ## Testing
 

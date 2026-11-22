@@ -5,6 +5,8 @@
 | Register business | n/a (public) | n/a |
 | Login / logout / me | yes | yes |
 | Dashboard, invoices, customers, imports | yes | yes |
+| Collections tasks, promises, disputes, timeline | yes | yes |
+| Mock inbox read, mock deliver, link confirm/reject | yes | yes |
 | Invite finance manager | yes | no |
 | List/revoke invitations | yes | no |
 | List team members | yes | no |

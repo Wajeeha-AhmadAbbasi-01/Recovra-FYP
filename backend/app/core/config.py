@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     upload_storage_dir: str = "./data/uploads"
 
     invitation_expiry_hours: int = 72
+    imap_enabled: bool = False
 
     @field_validator("session_secure_cookie", mode="before")
     @classmethod
